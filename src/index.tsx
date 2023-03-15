@@ -1,7 +1,9 @@
-import axios from 'axios'
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client';
-
+import {applyMiddleware, combineReducers, legacy_createStore as createStore} from 'redux'
+import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
+import axios from 'axios';
+import thunk, { ThunkAction, ThunkDispatch } from 'redux-thunk';
 
 // Types
 type PhotoType = {
@@ -11,75 +13,90 @@ type PhotoType = {
     url: string
 }
 
-type PayloadType = {
-    title: string
-    url?: string
-}
-
 // Api
 const instance = axios.create({baseURL: 'https://exams-frontend.kimitsu.it-incubator.ru/api/'})
 
-const photoId = '637df6dc99fdc52af974a517'
-
 const photosAPI = {
-    getPhoto() {
-        return instance.get<PhotoType>(`photos/${photoId}`)
+    getPhotos() {
+        return instance.get<PhotoType[]>('photos')
     },
-    updatePhoto(payload: PayloadType) {
-        return instance.put<PhotoType>(`photos/${photoId}`, payload)
+}
+
+
+// Reducer
+const initState = [] as PhotoType[]
+
+type InitStateType = typeof initState
+
+const photoReducer = (state: InitStateType = initState, action: ActionsType) => {
+    switch (action.type) {
+        case 'PHOTO/GET-PHOTOS':
+            return action.photos
+        default:
+            return state
     }
 }
-// App
-export const App = () => {
 
-    const [photo, setPhoto] = useState<PhotoType | null>(null)
+const getPhotosAC = (photos: PhotoType[]) => ({type: 'PHOTO/GET-PHOTOS', photos} as const)
+type ActionsType = ReturnType<typeof getPhotosAC>
 
-    useEffect(() => {
-        photosAPI.getPhoto()
-            .then((res) => {
-                setPhoto(res.data)
-            })
-    }, [])
+const getPhotosTC = (): AppThunk => (dispatch) => {
 
-    const updatePhotoHandler = () => {
-        // ❗ title и url указаны в качестве заглушки. Server сам сгенерирует новый title
-        const payload = {
-            title: 'Новый title',
-            url: 'data:image/png;base64,iVBORw0FAKEADDRESSnwMZAABJRUrkJggg=='
-        }
-        photosAPI.updatePhoto(payload)
-            .then((res) => {
-                console.log(res.data)
-                setPhoto(res.data)
-            })
+    console.log('thunk')
+    photosAPI.getPhotos()
+        .then((res) => {
+            dispatch(getPhotosAC(res.data))
+        })
+}
+
+// Store
+const rootReducer = combineReducers({
+    photo: photoReducer,
+})
+
+const store = createStore(rootReducer, applyMiddleware(thunk))
+type RootState = ReturnType<typeof store.getState>
+type AppDispatch = ThunkDispatch<RootState, unknown, ActionsType>
+type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, ActionsType>
+const useAppDispatch = () => useDispatch<AppDispatch>()
+const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+
+
+// Components
+const App = () => {
+    const dispatch = useAppDispatch()
+    const photos = useAppSelector(state => state.photo)
+
+    const getPhotosHandler = () => {
+        console.log('button')
+        dispatch(getPhotosTC())
     };
 
     return (
         <>
             <h1>📸 Фото</h1>
-            <div>
-                <div style={{marginBottom: '15px'}}>
-                    <h1>title: {photo?.title}</h1>
-                    <div><img src={photo?.url} alt=""/></div>
-                </div>
-                <button style={{marginLeft: '15px'}}
-                        onClick={updatePhotoHandler}>
-                    Изменить title
-                </button>
-            </div>
+            <button onClick={getPhotosHandler}>Подгрузить фотографии</button>
+            <div style={{display: 'flex', gap: '20px', margin: '20px'}}>{
+                photos.map(p => {
+                    return <div key={p.id}>
+                        <b>title</b>: {p.title}
+                        <div><img src={p.url} alt=""/></div>
+                    </div>
+                })
+            }</div>
         </>
     )
 }
 
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<App/>)
+root.render(<Provider store={store}> <App/></Provider>)
 
 // 📜 Описание:
-// При нажатии на кнопку "Изменить title" title должен обновиться,
-// но из-за невнимательности была допущена ошибка и изменение не происходит
-//
-// Найдите и исправьте ошибку
+// При нажатии на кнопку "Подгрузить фотографии" вы должны увидеть список фотографий,
+// но ничего не подгружается.
+// Найдите и исправьте ошибку.
+// Debugger / network / console.log вам в помощь.
 // Исправленную версию строки напишите в качестве ответа.
 
-// 🖥 Пример ответа: photosAPI.updatePhotoTitle(id, title)
+// 🖥 Пример ответа: type InitStateType = typeof initState

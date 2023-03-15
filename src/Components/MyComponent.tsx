@@ -1,85 +1,118 @@
-import axios from 'axios'
-import React from 'react'
+import React, { useEffect } from 'react'
+import ReactDOM from 'react-dom/client';
+import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux'
+import thunk, { ThunkAction, ThunkDispatch } from 'redux-thunk';
+import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
+import axios from 'axios';
 
 
 // Types
-type PhotoType = {
-    albumId: string
+type CommentType = {
+    postId: string
     id: string
-    title: string
-    url: string
-}
-
-type PayloadType = {
-    title: string
-    url?: string
+    name: string
+    email: string
+    body: string
 }
 
 // Api
 const instance = axios.create({baseURL: 'https://exams-frontend.kimitsu.it-incubator.ru/api/'})
 
-const photoId = '637df6dc99fdc52af974a517'
-
-const photosAPI = {
-    getPhoto() {
-        return instance.get<PhotoType>(`photos/${photoId}`)
+const commentsAPI = {
+    getComments() {
+        return instance.get<CommentType[]>('comments')
     },
-    updatePhoto(payload: PayloadType) {
-        return instance.put<PhotoType>(`photos/${photoId}`, {payload})
+    createComment() {
+        const payload = {
+            body: 'Это просто заглушка. Backend сам сгенерирует новый комментарий и вернет его вам',
+        }
+        return instance.post('comments', payload)
+    }
+}
+
+// Reducer
+const initState = [] as CommentType[]
+
+type InitStateType = typeof initState
+
+const commentsReducer = (state: InitStateType = initState, action: ActionsType) => {
+    switch (action.type) {
+        case 'COMMENTS/GET-COMMENTS':
+            return action.comments
+        case 'COMMENTS/CREATE-COMMENT':
+            return [action.comment, ...state]
+        default:
+            return state
     }
 }
 
 
-// // App
-// export const App = () => {
-//
-//     const [photo, setPhoto] = useState<PhotoType | null>(null)
-//
-//     useEffect(() => {
-//         photosAPI.getPhoto()
-//             .then((res) => {
-//                 setPhoto(res.data)
-//             })
-//     }, [])
-//
-//     const updatePhotoHandler = () => {
-//         // ❗ title и url указаны в качестве заглушки. Server сам сгенерирует новый title
-//         const payload = {
-//             title: 'Новый title',
-//             url: 'data:image/png;base64,iVBORw0FAKEADDRESSnwMZAABJRUrkJggg=='
-//         }
-//         photosAPI.updatePhoto(payload)
-//             .then((res) => {
-//                 setPhoto(res.data)
-//             })
-//     };
-//
-//     return (
-//         <>
-//             <h1>📸 Фото</h1>
-//             <div>
-//                 <div style={{marginBottom: '15px'}}>
-//                     <h1>title: {photo?.title}</h1>
-//                     <div><img src={photo?.url} alt=""/></div>
-//                 </div>
-//                 <button style={{marginLeft: '15px'}}
-//                         onClick={updatePhotoHandler}>
-//                     Изменить title
-//                 </button>
-//             </div>
-//         </>
-//     )
-// }
-//
-//
-// const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-// root.render(<App/>)
-//
-// // 📜 Описание:
-// // При нажатии на кнопку "Изменить title" title должен обновиться,
-// // но из-за невнимательности была допущена ошибка и изменение не происходит
-// //
-// // Найдите и исправьте ошибку
-// // Исправленную версию строки напишите в качестве ответа.
-//
-// // 🖥 Пример ответа: photosAPI.updatePhotoTitle(id, title)
+const getCommentsAC = (comments: CommentType[]) => ({type: 'COMMENTS/GET-COMMENTS', comments} as const)
+const createCommentAC = (comment: CommentType) => ({type: 'COMMENTS/CREATE-COMMENT', comment} as const)
+
+type ActionsType = ReturnType<typeof getCommentsAC> | ReturnType<typeof createCommentAC>
+
+const getCommentsTC = (): AppThunk => (dispatch) => {
+    commentsAPI.getComments()
+        .then((res) => {
+            dispatch(getCommentsAC(res.data))
+        })
+}
+
+const addCommentTC = (): AppThunk => (dispatch) => {
+    commentsAPI.createComment()
+        .then((res) => {
+            dispatch(createCommentAC(res.data))
+        })
+}
+
+// Store
+const rootReducer = combineReducers({
+    comments: commentsReducer,
+})
+
+const store = createStore(rootReducer, applyMiddleware(thunk))
+type RootState = ReturnType<typeof store.getState>
+type AppDispatch = ThunkDispatch<RootState, unknown, ActionsType>
+type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, ActionsType>
+const useAppDispatch = () => useDispatch<AppDispatch>()
+const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
+
+
+// App
+const App = () => {
+    const dispatch = useAppDispatch()
+    const comments = useAppSelector(state => state.comments)
+
+    useEffect(() => {
+        dispatch(getCommentsTC())
+    }, [])
+
+    const addCommentHandler = () => {
+        alert('Комментарий добавить не получилось. Напишите код самостоятельно 🚀')
+    };
+
+    return (
+        <>
+            <h1>📝 Список комментариев</h1>
+            <button style={{marginBottom: '10px'}}
+                    onClick={addCommentHandler}>Добавить новый комментарий
+            </button>
+            {
+                comments.map(p => {
+                    return <div key={p.id}><b>описание</b>: {p.body}</div>
+                })
+            }
+        </>
+    )
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
+root.render(<Provider store={store}> <App/></Provider>)
+
+// 📜 Описание:
+// При нажатии на кнопку "Добавить новый комментарий" комментарий должен добавиться,
+// но появляется alert.
+// Вместо alerta напишите код, чтобы комментарий добавлялся.
+// Правильную версию строки напишите в качестве ответа.
+// 🖥 Пример ответа: return instance.get<CommentType[]>('comments?_limit=10')
