@@ -1,74 +1,64 @@
 import React, { useEffect } from 'react'
+import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import ReactDOM from 'react-dom/client';
-import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux';
 import thunk, { ThunkAction, ThunkDispatch } from 'redux-thunk';
-import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
 import axios from 'axios';
 
-
-// Types
-type CommentType = {
-    postId: string
-    id: string
-    name: string
-    email: string
-    body: string
-}
+// Utils
+console.log = () => {
+};
 
 // Api
-const instance = axios.create({baseURL: 'https://exams-frontend.kimitsu.it-incubator.ru/api/'})
+const instance = axios.create({
+    baseURL: 'xxx'
+})
 
-const commentsAPI = {
-    getComments() {
-        return instance.get<CommentType[]>('comments')
-    },
-    createComment() {
-        const payload = {
-            body: 'Это просто заглушка. Backend сам сгенерирует новый комментарий и вернет его вам',
-        }
-        return instance.post('comments', payload)
+const api = {
+    getUsers() {
+        /* 1 */
+        return instance.get('xxx')
     }
 }
 
+
 // Reducer
-const initState = [] as CommentType[]
+const initState = {
+    isLoading: false,
+    users: [] as any[]
+}
 
 type InitStateType = typeof initState
 
-const commentsReducer = (state: InitStateType = initState, action: ActionsType) => {
+const appReducer = (state: InitStateType = initState, action: ActionsType): InitStateType => {
     switch (action.type) {
-        case 'COMMENTS/GET-COMMENTS':
-            return action.comments
-        case 'COMMENTS/CREATE-COMMENT':
-            return [action.comment, ...state]
+        case 'APP/SET-USERS':
+            /* 2 */
+            return {...state, users: action.users}
         default:
             return state
     }
 }
 
+// Actions
+const setUsersAC = (users: any[]) => ({type: 'APP/SET-USERS', users} as const)
+type ActionsType = ReturnType<typeof setUsersAC>
 
-const getCommentsAC = (comments: CommentType[]) => ({type: 'COMMENTS/GET-COMMENTS', comments} as const)
-const createCommentAC = (comment: CommentType) => ({type: 'COMMENTS/CREATE-COMMENT', comment} as const)
 
-type ActionsType = ReturnType<typeof getCommentsAC> | ReturnType<typeof createCommentAC>
-
-const getCommentsTC = (): AppThunk => (dispatch) => {
-    commentsAPI.getComments()
+// Thunk
+const getUsersTC = (): AppThunk => (dispatch) => {
+    /* 3 */
+    api.getUsers()
         .then((res) => {
-            dispatch(getCommentsAC(res.data))
-        })
-}
-
-const addCommentTC = (): AppThunk => (dispatch) => {
-    commentsAPI.createComment()
-        .then((res) => {
-            dispatch(createCommentAC(res.data))
+            /* 4 */
+            dispatch(setUsersAC(res.data.data))
         })
 }
 
 // Store
 const rootReducer = combineReducers({
-    comments: commentsReducer,
+    app: appReducer,
 })
 
 const store = createStore(rootReducer, applyMiddleware(thunk))
@@ -79,40 +69,49 @@ const useAppDispatch = () => useDispatch<AppDispatch>()
 const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
 
 
-// App
-const App = () => {
-    const dispatch = useAppDispatch()
-    const comments = useAppSelector(state => state.comments)
+// Login
+export const Login = () => {
 
-    useEffect(() => {
-        dispatch(getCommentsTC())
-    }, [])
-
-    const addCommentHandler = () => {
-        alert('Комментарий добавить не получилось. Напишите код самостоятельно 🚀')
-    };
+    const users = useAppSelector(state => state.app.users)
+    /* 5 */
 
     return (
-        <>
-            <h1>📝 Список комментариев</h1>
-            <button style={{marginBottom: '10px'}}
-                    onClick={addCommentHandler}>Добавить новый комментарий
-            </button>
-            {
-                comments.map(p => {
-                    return <div key={p.id}><b>описание</b>: {p.body}</div>
-                })
-            }
-        </>
+        <div>
+            {/* 6 */}
+            {users.map((u) => <p key={u.id}>{u.email}</p>)}
+            <h1>В данном задании на экран смотреть не нужно. Рекомендуем взять ручку, листик и последовательно, спокойно
+                расставить цифры в нужном порядке. Прежде чем давать ответ обязательно посчитайте к-во цифр и сверьте с
+                подсказкой. Удачи 🚀
+            </h1>
+        </div>
+    );
+}
+
+// App
+export const App = () => {
+
+    /* 7 */
+    const dispatch = useAppDispatch()
+
+    useEffect(() => {
+        /* 8 */
+        dispatch(getUsersTC())
+    }, [])
+
+    /* 9 */
+    return (
+        <Routes>
+            <Route path={''} element={<Login/>}/>
+        </Routes>
     )
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<Provider store={store}> <App/></Provider>)
+root.render(<Provider store={store}><BrowserRouter><App/></BrowserRouter></Provider>)
 
 // 📜 Описание:
-// При нажатии на кнопку "Добавить новый комментарий" комментарий должен добавиться,
-// но появляется alert.
-// Вместо alerta напишите код, чтобы комментарий добавлялся.
-// Правильную версию строки напишите в качестве ответа.
-// 🖥 Пример ответа: return instance.get<CommentType[]>('comments?_limit=10')
+// Задача: напишите в какой последовательности вызовутся числа при успешном запросе.
+// Подсказка: будет 11 чисел.
+// Ответ дайте через пробел.
+
+// 🖥 Пример ответа: 1 2 3 4 5 6 7 8 9 1 2
