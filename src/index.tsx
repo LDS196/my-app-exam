@@ -1,65 +1,44 @@
 import React, { useEffect } from 'react'
-import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux';
-import thunk, { ThunkAction, ThunkDispatch } from 'redux-thunk';
-import axios from 'axios';
+import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux'
+import thunk, { ThunkAction, ThunkDispatch } from 'redux-thunk'
+import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import axios from 'axios'
 
-// Utils
-console.log = () => {
-};
-
-// Api
-const instance = axios.create({
-    baseURL: 'xxx'
-})
+// API
+const instance = axios.create({baseURL: 'https://exams-frontend.kimitsu.it-incubator.ru/api/'})
 
 const api = {
-    getUsers() {
-        /* 1 */
-        return instance.get('xxx')
-    }
+    me() {
+        return instance.get('auth/me?delay=3')
+    },
 }
 
 
 // Reducer
 const initState = {
+    isInitialized: false,
     isLoading: false,
-    users: [] as any[]
+    isLoggedIn: false
 }
-
 type InitStateType = typeof initState
 
 const appReducer = (state: InitStateType = initState, action: ActionsType): InitStateType => {
     switch (action.type) {
-        case 'APP/SET-USERS':
-            /* 2 */
-            return {...state, users: action.users}
+        case 'SET_IS_INITIALIZED':
+            return {...state, isInitialized: action.isInitialized}
+        case 'SET_LOADING':
+            return {...state, isLoading: action.isLoading}
+        case 'SET_IS_LOGGED_IN':
+            return {...state, isLoggedIn: action.isLoggedIn}
         default:
             return state
     }
 }
 
-// Actions
-const setUsersAC = (users: any[]) => ({type: 'APP/SET-USERS', users} as const)
-type ActionsType = ReturnType<typeof setUsersAC>
-
-
-// Thunk
-const getUsersTC = (): AppThunk => (dispatch) => {
-    /* 3 */
-    api.getUsers()
-        .then((res) => {
-            /* 4 */
-            dispatch(setUsersAC(res.data.data))
-        })
-}
-
 // Store
-const rootReducer = combineReducers({
-    app: appReducer,
-})
+const rootReducer = combineReducers({app: appReducer})
 
 const store = createStore(rootReducer, applyMiddleware(thunk))
 type RootState = ReturnType<typeof store.getState>
@@ -68,50 +47,86 @@ type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, A
 const useAppDispatch = () => useDispatch<AppDispatch>()
 const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
 
+const setIsInitialized = (isInitialized: boolean) => ({type: 'SET_IS_INITIALIZED', isInitialized} as const)
+const setLoading = (isLoading: boolean) => ({type: 'SET_LOADING', isLoading} as const)
+const setIsLoggedIn = (isLoggedIn: boolean) => ({type: 'SET_IS_LOGGED_IN', isLoggedIn} as const)
+type ActionsType =
+    | ReturnType<typeof setLoading>
+    | ReturnType<typeof setIsInitialized>
+    | ReturnType<typeof setIsLoggedIn>
 
-// Login
-export const Login = () => {
+// Thunk
+const me = (): AppThunk => async (dispatch) => {
+    dispatch(setLoading(true))
+    api.me()
+        .then((res) => {
+            dispatch(setIsLoggedIn(true))
+        })
+        .finally(() => {
+            dispatch(setLoading(false))
+            dispatch(setIsInitialized(true))
+        })
 
-    const users = useAppSelector(state => state.app.users)
-    /* 5 */
-
-    return (
-        <div>
-            {/* 6 */}
-            {users.map((u) => <p key={u.id}>{u.email}</p>)}
-            <h1>В данном задании на экран смотреть не нужно. Рекомендуем взять ручку, листик и последовательно, спокойно
-                расставить цифры в нужном порядке. Прежде чем давать ответ обязательно посчитайте к-во цифр и сверьте с
-                подсказкой. Удачи 🚀
-            </h1>
-        </div>
-    );
 }
 
-// App
-export const App = () => {
+// Components
+const Loader = () => <h2>🔘 Крутилка...</h2>
 
-    /* 7 */
+const Login = () => {
+    const isInitialized = useAppSelector(state => state.app.isInitialized)
+    const isLoading = useAppSelector(state => state.app.isLoading)
+    const isLoggedIn = useAppSelector(state => state.app.isLoggedIn)
+
+    if (isLoggedIn) {
+        return <Navigate to={'/'}/>
+    }
+
+    return <h2>🐣 Login</h2>
+}
+const Profile = () => {
+    const isInitialized = useAppSelector(state => state.app.isInitialized)
+    const isLoading = useAppSelector(state => state.app.isLoading)
+    const isLoggedIn = useAppSelector(state => state.app.isLoggedIn)
+
+    if (!isLoggedIn) {
+        return <Navigate to={'/login'}/>
+    }
+
+    return <h2>😎 Profile </h2>
+}
+
+export const App = () => {
+    const isInitialized = useAppSelector(state => state.app.isInitialized)
+    const isLoading = useAppSelector(state => state.app.isLoading)
+    const isLoggedIn = useAppSelector(state => state.app.isLoggedIn)
+
     const dispatch = useAppDispatch()
 
     useEffect(() => {
-        /* 8 */
-        dispatch(getUsersTC())
+        dispatch(me())
     }, [])
 
-    /* 9 */
     return (
         <Routes>
-            <Route path={''} element={<Login/>}/>
+            <Route path={'/'} element={<Profile/>}/>
+            <Route path={'login'} element={<Login/>}/>
         </Routes>
     )
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
-root.render(<Provider store={store}><BrowserRouter><App/></BrowserRouter></Provider>)
+root.render(
+    <BrowserRouter>
+        <Provider store={store}>
+            <App/>
+        </Provider>
+    </BrowserRouter>
+);
 
 // 📜 Описание:
-// Задача: напишите в какой последовательности вызовутся числа при успешном запросе.
-// Подсказка: будет 11 чисел.
-// Ответ дайте через пробел.
+// После старта / обновления приложения мы видим Login, а потом через 3 секунды Profile
+// Но это плохое поведение.
+// Ваша задача написать код при котором пользователя не будет редиректить на Login,
+// а во время ожидания ответа с сервера он будет видеть Loader
 
-// 🖥 Пример ответа: 1 2 3 4 5 6 7 8 9 1 2
+// 🖥 Пример ответа: <Loader/>
