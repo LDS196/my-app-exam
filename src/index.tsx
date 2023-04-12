@@ -1,40 +1,32 @@
-import React, { useEffect } from 'react'
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { applyMiddleware, combineReducers, legacy_createStore as createStore } from 'redux'
 import thunk, { ThunkAction, ThunkDispatch } from 'redux-thunk'
 import { Provider, TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux'
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import axios from 'axios'
-
-// API
-const instance = axios.create({baseURL: 'https://exams-frontend.kimitsu.it-incubator.ru/api/'})
-
-const api = {
-    me() {
-        return instance.get('auth/me?delay=3')
-    },
-}
-
 
 // Reducer
 const initState = {
-    isInitialized: false,
-    isLoading: false,
-    isLoggedIn: false
+    animals: [
+        {likes: 0, name: 'cat'},
+        {likes: 0, name: 'dog'},
+        {likes: 0, name: 'fish'},
+        {likes: 0, name: 'spider'},
+        {likes: 0, name: 'bird'},
+    ] as { likes: number, name: string }[]
 }
 type InitStateType = typeof initState
 
 const appReducer = (state: InitStateType = initState, action: ActionsType): InitStateType => {
     switch (action.type) {
-        case 'SET_IS_INITIALIZED':
-            return {...state, isInitialized: action.isInitialized}
-        case 'SET_LOADING':
-            return {...state, isLoading: action.isLoading}
-        case 'SET_IS_LOGGED_IN':
-            return {...state, isLoggedIn: action.isLoggedIn}
-        default:
-            return state
+        case 'LIKE':
+            return {
+                ...state,
+                animals: state.animals.map(animal => {
+                    return true ? {...animal} : animal
+                })
+            }
     }
+    return state
 }
 
 // Store
@@ -47,86 +39,40 @@ type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, A
 const useAppDispatch = () => useDispatch<AppDispatch>()
 const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
 
-const setIsInitialized = (isInitialized: boolean) => ({type: 'SET_IS_INITIALIZED', isInitialized} as const)
-const setLoading = (isLoading: boolean) => ({type: 'SET_LOADING', isLoading} as const)
-const setIsLoggedIn = (isLoggedIn: boolean) => ({type: 'SET_IS_LOGGED_IN', isLoggedIn} as const)
-type ActionsType =
-    | ReturnType<typeof setLoading>
-    | ReturnType<typeof setIsInitialized>
-    | ReturnType<typeof setIsLoggedIn>
-
-// Thunk
-const me = (): AppThunk => async (dispatch) => {
-    dispatch(setLoading(true))
-    api.me()
-        .then((res) => {
-            dispatch(setIsLoggedIn(true))
-        })
-        .finally(() => {
-            dispatch(setLoading(false))
-            dispatch(setIsInitialized(true))
-        })
-
-}
+const like = (likes: any, name: any) => ({type: 'LIKE', likes, name} as const)
+type ActionsType = ReturnType<typeof like>
 
 // Components
-const Loader = () => <h2>🔘 Крутилка...</h2>
-
-const Login = () => {
-    const isInitialized = useAppSelector(state => state.app.isInitialized)
-    const isLoading = useAppSelector(state => state.app.isLoading)
-    const isLoggedIn = useAppSelector(state => state.app.isLoggedIn)
-
-    if (isLoggedIn) {
-        return <Navigate to={'/'}/>
-    }
-
-    return <h2>🐣 Login</h2>
-}
-const Profile = () => {
-    const isInitialized = useAppSelector(state => state.app.isInitialized)
-    const isLoading = useAppSelector(state => state.app.isLoading)
-    const isLoggedIn = useAppSelector(state => state.app.isLoggedIn)
-
-    if (!isLoggedIn) {
-        return <Navigate to={'/login'}/>
-    }
-
-    return <h2>😎 Profile </h2>
-}
-
-export const App = () => {
-    const isInitialized = useAppSelector(state => state.app.isInitialized)
-    const isLoading = useAppSelector(state => state.app.isLoading)
-    const isLoggedIn = useAppSelector(state => state.app.isLoggedIn)
-
+export const Animals = () => {
+    const animals = useAppSelector(state => state.app.animals)
     const dispatch = useAppDispatch()
 
-    useEffect(() => {
-        dispatch(me())
-    }, [])
+    const mapped = animals
+        .map((a: any, i: number) => (
+            <div key={i}>
+                {a.name}
+                -{a.likes}-
+                <button
+                    onClick={() => dispatch(like(a.likes + 1, a.name))}
+                >
+                    Like!
+                </button>
+            </div>
+        ))
+
 
     return (
-        <Routes>
-            <Route path={'/'} element={<Profile/>}/>
-            <Route path={'login'} element={<Login/>}/>
-        </Routes>
+        <div>
+            {mapped}
+        </div>
     )
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
-    <BrowserRouter>
-        <Provider store={store}>
-            <App/>
-        </Provider>
-    </BrowserRouter>
+    <Provider store={store}>
+        <Animals/>
+    </Provider>
 );
 
-// 📜 Описание:
-// После старта / обновления приложения мы видим Login, а потом через 3 секунды Profile
-// Но это плохое поведение.
-// Ваша задача написать код при котором пользователя не будет редиректить на Login,
-// а во время ожидания ответа с сервера он будет видеть Loader
 
-// 🖥 Пример ответа: <Loader/>
